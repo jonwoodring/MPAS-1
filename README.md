@@ -1,37 +1,51 @@
-# MPAS
+# MPAS-Ocean Docker for Starcluster for AWS
 
-Instructions for running diverge after Randall's instructions at  *Launch a starcluster named <cluster>*
+Instructions for running diverge after Randall's instructions at  *Launch a starcluster named `<cluster>`*
 
 ```bash
-$ starcluster start -c <cluster> <cluster>
+$ starcluster start -c <cluster_spec> <cluster>
 $ starcluster sshmaster <cluster>
 ```
 
-Now you are on the cluster on AWS. Next is to clone the mpasdocker git repository
-It is very important that you have to clone the mapsdocker git repository to the local directory where the shared data volume is mounted.
+Now you are on the cluster on AWS.  You have to clone the git 
+repository to the directory where the shared data volume is mounted on
+starcluster (assuming that's `/home/mpas`)
+
 ```bash
 $ cd /home/mpas
-$ git clone https://github.com/guanxyz/MPAS
+$ git clone https://github.com/jonwoodring/MPAS-1
+$ mv MPAS-1 MPAS
 $ cd MPAS
 ```
 
-Edit `hostfile` to represent the number of nodes on your `<cluster>`. In this case, we use a two-nodes cluster
-Edit `machinefile` to represent the number of nodes *and* processors on your `<cluster>`
+Copy your MPAS tarball with the source code into `/home/mpas/MPAS` as 
+`MPAS.tar.gz`
 
-This builds your docker, which is one process per node.
+Extract your initial world QU 240km input deck and restart into 
+`/home/mpas/worldOcean_QU_240km`
+
+Edit `hostfile` to represent the number of nodes on your `<cluster>`. 
+
+Edit `machinefile` to represent the number of nodes *and* processors 
+on your `<cluster>`.
+
+Copy the tarball of the MPAS source code into /home/mpas/MPAS-1
+
+This builds your docker of MPAS, which is one process per node.
 ```bash
-$ mpirun -hostfile hostfile --mca btl_tcp_if_include eth0 ./mpibuild_mpas.sh --verbose --output-filename=mpibuild
+$ build-sim.sh
 ```
 
 This runs your simulation in docker, which is *n* processes per node.
 ```bash
-$ mpirun -hostfile hostfile --mca btl_tcp_if_include eth0 ./mpirun_mpas.sh --verbose --output-filename=mpirun
+$ run-sim.sh
 ```
 
+===
 
-<h3> Description of Files </h3>
-  * Dockerfile -- build of MPAS and I/O libraries into a Docker container
-  * mpibuild_mpas.sh -- script that builds the docker container on each node
-  * mpirun_mpas.sh -- script to launch H3D with docker containers on each node 
-  * runmpas.sh -- script that runs H3D inside a docker container on the master node.  DO NOT call this directly.  It is called by mpirun_mpas.sh
- 
+If you want to rebuild the image for the io layer (which isn't necessary), 
+do this (which will need to be squashed and referenced in Dockerbuildmpas)
+
+```bash
+$ build-io.sh
+```

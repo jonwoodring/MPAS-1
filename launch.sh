@@ -1,20 +1,31 @@
 #!/bin/bash
 
-# if you are the master node run the code
 if [ $HOSTNAME == 'master' ]; then
 
-echo "Starting mpas on master"
+# if you are the master node run the code
 
 chown -R user:user /home/user/LANL/
+cd /home/user/LANL/app
+cp /home/user/LANL/libs/MPAS/MPAS/ocean_model ocean_model
+chown user:user ocean_model
 
-# run the code as a user
-su user -c /home/user/LANL/runmpas.sh 
+sleep 3
+echo "Starting mpas on master"
 
-# All slave nodes launch the ssh server
+echo `date`
+
+su user -c "mpiexec -machinefile /home/user/LANL/machinefile ./ocean_model"
+
+echo `date`
+echo ***DONE***
+
 else
 
-echo "Starting sshd"
+# All slave nodes launch the ssh server
+
+echo "Starting sshd on slaves"
 mkdir /var/run/sshd
 /usr/sbin/sshd -D
 
 fi
+

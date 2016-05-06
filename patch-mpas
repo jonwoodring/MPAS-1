@@ -1,0 +1,164 @@
+diff --git a/src/core_ocean/Makefile b/src/core_ocean/Makefile
+index d0bd3b9..4ee33a3 100644
+--- a/src/core_ocean/Makefile
++++ b/src/core_ocean/Makefile
+@@ -46,11 +46,11 @@ post_build:
+ 	( cp $(ROOT_DIR)/default_inputs/streams.ocean.init $(ROOT_DIR)/streams.ocean.init )
+ 
+ cvmix_source: get_cvmix.sh
+-	(chmod a+x get_cvmix.sh; ./get_cvmix.sh)
++	(chmod a+x get_cvmix.sh; sync; ./get_cvmix.sh)
+ 	(cd cvmix)
+ 
+ BGC_source: get_BGC.sh
+-	(chmod a+x get_BGC.sh; ./get_BGC.sh)
++	(chmod a+x get_BGC.sh; sync; ./get_BGC.sh)
+ 	(cd BGC)
+ 
+ libcvmix: cvmix_source
+diff --git a/src/driver/mpas_subdriver.F b/src/driver/mpas_subdriver.F
+index 549a1ac..1f62bd5 100644
+--- a/src/driver/mpas_subdriver.F
++++ b/src/driver/mpas_subdriver.F
+@@ -259,7 +259,7 @@ module mpas_subdriver
+       else if (trim(iotype) == 'netcdf4') then
+          mesh_iotype = MPAS_IO_NETCDF4
+       else
+-         mesh_iotype = MPAS_IO_PNETCDF
++         mesh_iotype = MPAS_IO_NETCDF
+       end if
+ 
+       start_time = mpas_get_clock_time(domain_ptr % clock, MPAS_START_TIME, ierr)
+diff --git a/src/framework/mpas_io.F b/src/framework/mpas_io.F
+index f319c24..67060d0 100644
+--- a/src/framework/mpas_io.F
++++ b/src/framework/mpas_io.F
+@@ -23,12 +23,12 @@ module mpas_io
+    integer, parameter :: PIO_REALKIND = PIO_DOUBLE
+ #endif
+ 
+-   integer, parameter :: MPAS_INT_FILLVAL = NF_FILL_INT
+-   character, parameter :: MPAS_CHAR_FILLVAL = achar(NF_FILL_CHAR)
++   integer, parameter :: MPAS_INT_FILLVAL = -2147483647
++   character, parameter :: MPAS_CHAR_FILLVAL = achar(0)
+ #ifdef SINGLE_PRECISION
+-   real (kind=RKIND), parameter :: MPAS_REAL_FILLVAL = NF_FILL_FLOAT
++   real (kind=RKIND), parameter :: MPAS_REAL_FILLVAL = 9.9692099683868690e+36
+ #else
+-   real (kind=RKIND), parameter :: MPAS_REAL_FILLVAL = NF_FILL_DOUBLE
++   real (kind=RKIND), parameter :: MPAS_REAL_FILLVAL = 9.9692099683868690d+36
+ #endif
+    
+    interface MPAS_io_get_var
+@@ -260,7 +260,7 @@ module mpas_io
+             pio_mode = PIO_64BIT_OFFSET
+          else if (ioformat == MPAS_IO_PNETCDF5) then
+             pio_iotype = PIO_iotype_pnetcdf
+-            pio_mode = PIO_64BIT_DATA
++            pio_mode = 16
+          else if (ioformat == MPAS_IO_NETCDF) then
+             pio_iotype = PIO_iotype_netcdf
+             pio_mode = PIO_64BIT_OFFSET
+diff --git a/src/framework/mpas_stream_manager.F b/src/framework/mpas_stream_manager.F
+index 269604a..aa19302 100644
+--- a/src/framework/mpas_stream_manager.F
++++ b/src/framework/mpas_stream_manager.F
+@@ -284,14 +284,14 @@ module mpas_stream_manager
+     !>  stream; possible values are defined by constants in the mpas_io module and
+     !>  include: MPAS_IO_NETCDF, MPAS_IO_NETCDF4, MPAS_IO_PNETCDF, and
+     !>  MPAS_IO_PNETCDF5. If not specified, the io_type will default to
+-    !>  MPAS_IO_PNETCDF.
++    !>  MPAS_IO_NETCDF.
+     !
+     !-----------------------------------------------------------------------
+     subroutine MPAS_stream_mgr_create_stream(manager, streamID, direction, filename, &
+                                              filenameInterval, referenceTime, recordInterval, &
+                                              realPrecision, clobberMode, ioType, ierr) !{{{
+ 
+-        use mpas_io, only : MPAS_IO_PNETCDF
++        use mpas_io, only : MPAS_IO_NETCDF
+ 
+         implicit none
+ 
+@@ -355,7 +355,7 @@ module mpas_stream_manager
+            if (present(ioType)) then
+                new_stream % io_type = ioType
+            else
+-               new_stream % io_type = MPAS_IO_PNETCDF
++               new_stream % io_type = MPAS_IO_NETCDF
+            end if
+            allocate(new_stream % referenceTime)
+            if (present(referenceTime)) then
+@@ -5172,7 +5172,7 @@ subroutine stream_mgr_create_stream_c(manager_c, streamID_c, direction_c, filena
+     else if (iotype_c == 3) then
+        iotype = MPAS_IO_NETCDF4
+     else
+-       iotype = MPAS_IO_PNETCDF
++       iotype = MPAS_IO_NETCDF
+     end if
+ 
+     STREAM_DEBUG_WRITE('Creating stream from c...')
+diff --git a/src/framework/xml_stream_parser.c b/src/framework/xml_stream_parser.c
+index 4ff2b00..8383e87 100644
+--- a/src/framework/xml_stream_parser.c
++++ b/src/framework/xml_stream_parser.c
+@@ -1203,7 +1203,7 @@ void xml_stream_parser(char *fname, void *manager, int *mpi_comm, int *status)
+ 		}
+ 
+ 		/* NB: These io_type constants must match those in the mpas_stream_manager module! */
+-		i_iotype = 0;
++		i_iotype = 2;
+ 		if (iotype != NULL) {
+ 			if (strstr(iotype, "pnetcdf,cdf5") != NULL) {
+ 				i_iotype = 1;
+@@ -1222,8 +1222,8 @@ void xml_stream_parser(char *fname, void *manager, int *mpi_comm, int *status)
+ 				fprintf(stderr, "        %-20s%s\n", "I/O type:", "Serial NetCDF");
+ 			}
+ 			else {
+-				i_iotype = 0;
+-				fprintf(stderr, "        *** unrecognized io_type specification; defaulting to Parallel-NetCDF\n");
++				i_iotype = 2;
++				fprintf(stderr, "        *** unrecognized io_type specification; defaulting to NetCDF\n");
+ 			}
+ 		}
+ 
+@@ -1485,7 +1485,7 @@ void xml_stream_parser(char *fname, void *manager, int *mpi_comm, int *status)
+ 		}
+ 
+ 		/* NB: These io_type constants must match those in the mpas_stream_manager module! */
+-		i_iotype = 0;
++		i_iotype = 2;
+ 		if (iotype != NULL) {
+ 			if (strstr(iotype, "pnetcdf,cdf5") != NULL) {
+ 				i_iotype = 1;
+@@ -1504,8 +1504,8 @@ void xml_stream_parser(char *fname, void *manager, int *mpi_comm, int *status)
+ 				fprintf(stderr, "        %-20s%s\n", "I/O type:", "Serial NetCDF");
+ 			}
+ 			else {
+-				i_iotype = 0;
+-				fprintf(stderr, "        *** unrecognized io_type specification; defaulting to Parallel-NetCDF\n");
++				i_iotype = 2;
++				fprintf(stderr, "        *** unrecognized io_type specification; defaulting to NetCDF\n");
+ 			}
+ 		}
+ 
+@@ -1856,7 +1856,7 @@ void xml_stream_get_attributes(char *fname, char *streamname, int *mpi_comm, cha
+ 
+ 			if ( xml_iotype == NULL ) {
+ 				fprintf(stderr, "Using default io_type for mesh stream\n");
+-				sprintf(io_type, "pnetcdf");
++				sprintf(io_type, "netcdf");
+ 			} else {
+ 				if (strstr(xml_iotype, "pnetcdf,cdf5") != NULL) {
+ 					sprintf(io_type, "%s", xml_iotype);
+@@ -1875,8 +1875,8 @@ void xml_stream_get_attributes(char *fname, char *streamname, int *mpi_comm, cha
+ 					fprintf(stderr, "Using io_type Serial NetCDF for mesh stream\n");
+ 				}
+ 				else {
+-					sprintf(io_type, "pnetcdf");
+-					fprintf(stderr, "*** unrecognized io_type specification for mesh stream; defaulting to Parallel-NetCDF\n");
++					sprintf(io_type, "netcdf");
++					fprintf(stderr, "*** unrecognized io_type specification for mesh stream; defaulting to NetCDF\n");
+ 				}
+ 			}
+ 			break;

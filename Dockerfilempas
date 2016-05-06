@@ -1,0 +1,73 @@
+from jonwoodring/mpasio:20160505
+ 
+MAINTAINER jonwoodring "woodring@lanl.gov"
+
+ENV MPAS_PATH /home/user/LANL
+ENV MPAS_LIBS_PATH /home/user/LANL/libs
+ENV IO_DEST $MPAS_LIBS_PATH/io
+ENV NETCDF_C_SOURCE $MPAS_LIBS_PATH/netcdf-4.3.2
+ENV NETCDF_F_SOURCE $MPAS_LIBS_PATH/netcdf-fortran-4.4.1
+ENV PIO_SOURCE $MPAS_LIBS_PATH/pio1_7_1/pio
+
+ENV NETCDF_PATH $IO_DEST
+
+ENV F77 gfortran
+ENV F90 gfortran
+ENV CC gcc
+ENV FC gfortran
+ENV MPIFC mpif90
+ENV MPIF77 mpif77
+ENV MPIF90 mpif90
+ENV MPICC mpicc
+
+ENV CFLAGS -I$IO_DEST/include
+ENV FFLAGS -I$IO_DEST/include
+ENV LDFLAGS -L$IO_DEST/lib
+
+# Install MPAS
+RUN mkdir $MPAS_LIBS_PATH/MPAS
+WORKDIR $MPAS_LIBS_PATH/MPAS
+# This is the MPAS-Dev tarball, which you only have if you have 
+# private access to MPAS-Dev
+ADD MPAS.tar.gz $MPAS_LIBS_PATH/MPAS
+#RUN git clone https://github.com/MPAS-Dev/MPAS-Release.git
+#RUN wget https://github.com/MPAS-Dev/MPAS-Release/archive/v3.3.tar.gz
+#RUN tar zxvf v3.3.tar.gz
+WORKDIR $MPAS_LIBS_PATH/MPAS/MPAS
+
+# from make.sh by Jon Woodring
+USER root
+RUN ln -s `which python2` python
+ENV PATH `pwd`:$PATH
+
+ENV NETCDF $IO_DEST
+ENV PIO $IO_DEST
+
+ENV CORE ocean
+ENV MODE forward
+ENV AUTOCLEAN true
+ENV DEBUG true
+
+# Patch MPAS
+ADD patch-mpas $MPAS_LIBS_PATH/MPAS/MPAS
+RUN git apply patch-mpas
+
+RUN make clean
+RUN make gfortran
+
+
+#################################################
+# Input Stack
+#################################################
+# You can use wget to get the input stack but we 
+# cannot mount the data volume during the building
+# time.
+ADD launch.sh $MPAS_PATH
+ADD machinefile $MPAS_PATH
+#CMD chown user:user launch.sh && chown user:user runmpas.sh && chown user:user machinefile
+
+WORKDIR $MPAS_PATH
+USER root
+# You can also use -v during docker run to mount
+# the data volume 
+
